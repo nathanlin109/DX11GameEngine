@@ -2,6 +2,8 @@
 
 #include "DXCore.h"
 #include <DirectXMath.h>
+#include <memory>
+#include "Mesh.h"
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
 
 class Game 
@@ -32,15 +34,15 @@ private:
 	//  - This is a smart pointer for objects that abide by the
 	//    Component Object Model, which DirectX objects do
 	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
-
-	// Buffers to hold actual geometry data
-	Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
-	Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
 	
 	// Shaders and shader-related constructs
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout;
 
+	// Shared ptrs for the 3 meshes drawn
+	std::shared_ptr<Mesh> triangle;
+	std::shared_ptr<Mesh> rectangle;
+	std::shared_ptr<Mesh> star;
 };
 

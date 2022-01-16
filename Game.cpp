@@ -161,7 +161,7 @@ void Game::CreateBasicGeometry()
 	//    knowing the exact size (in pixels) of the image/window/etc.  
 	// - Long story short: Resizing the window also resizes the triangle,
 	//    since we're describing the triangle in terms of the window itself
-	Vertex vertices[] =
+	Vertex triangleVertices[] =
 	{
 		{ XMFLOAT3(+0.0f, +0.5f, +0.0f), red },
 		{ XMFLOAT3(+0.5f, -0.5f, +0.0f), blue },
@@ -173,51 +173,53 @@ void Game::CreateBasicGeometry()
 	// - Indices are technically not required if the vertices are in the buffer 
 	//    in the correct order and each one will be used exactly once
 	// - But just to see how it's done...
-	unsigned int indices[] = { 0, 1, 2 };
+	unsigned int triangleIndices[] = { 0, 1, 2 };
 
+	triangle = std::make_shared<Mesh>(triangleVertices, 3, triangleIndices, 3, device, context);
 
-	// Create the VERTEX BUFFER description -----------------------------------
-	// - The description is created on the stack because we only need
-	//    it to create the buffer.  The description is then useless.
-	D3D11_BUFFER_DESC vbd = {};
-	vbd.Usage = D3D11_USAGE_IMMUTABLE;
-	vbd.ByteWidth = sizeof(Vertex) * 3;       // 3 = number of vertices in the buffer
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER; // Tells DirectX this is a vertex buffer
-	vbd.CPUAccessFlags = 0;
-	vbd.MiscFlags = 0;
-	vbd.StructureByteStride = 0;
+	// Vertex array for rectangle
+	Vertex rectangleVertices[] =
+	{
+		{ XMFLOAT3(-0.75f, +0.5f, +0.0f), red }, // Top left
+		{ XMFLOAT3(-0.5f, +0.0f, +0.0f), blue }, // Bottom right
+		{ XMFLOAT3(-0.75f, +0.0f, +0.0f), green }, // Bottom left
+		{ XMFLOAT3(-0.5f, +0.5f, +0.0f), green }, // Top right
+	};
 
-	// Create the proper struct to hold the initial vertex data
-	// - This is how we put the initial data into the buffer
-	D3D11_SUBRESOURCE_DATA initialVertexData = {};
-	initialVertexData.pSysMem = vertices;
+	// Index array for rectangle
+	unsigned int rectangleIndices[] = { 0, 1, 2, 0, 3, 1 };
+	rectangle = std::make_shared<Mesh>(rectangleVertices, 4, rectangleIndices, 6, device, context);
 
-	// Actually create the buffer with the initial data
-	// - Once we do this, we'll NEVER CHANGE THE BUFFER AGAIN
-	device->CreateBuffer(&vbd, &initialVertexData, vertexBuffer.GetAddressOf());
+	// Vertex array for star
+	Vertex starVertices[] =
+	{
+		// Create a pentagon first
+		{ XMFLOAT3(+0.6f, +0.35f, +0.0f), red }, // center
+		{ XMFLOAT3(+0.6f, +0.1f, +0.0f), green }, // Bottom
+		{ XMFLOAT3(+0.35f, +0.35f, +0.0f), green }, // bottom left
+		{ XMFLOAT3(+0.45f, +0.6f, +0.0f), green }, // top left
+		{ XMFLOAT3(+0.75f, +0.6f, +0.0f), green }, // top right
+		{ XMFLOAT3(+0.85f, +0.35f, +0.0f), green }, // bottom right
+		// Create triangles on edges of pentagon
+		{ XMFLOAT3(+0.6f, +0.85f, +0.0f), blue }, // top tip
+		{ XMFLOAT3(+0.95f, +0.6f, +0.0f), blue }, // top right tip
+		{ XMFLOAT3(+0.9f, +0.01f, +0.0f), blue }, // bottom right tip
+		{ XMFLOAT3(+0.3f, +0.0f, +0.0f), blue }, // bottom left tip
+		{ XMFLOAT3(+0.25f, +0.6f, +0.0f), blue }, // top left tip
+	};
 
-
-
-	// Create the INDEX BUFFER description ------------------------------------
-	// - The description is created on the stack because we only need
-	//    it to create the buffer.  The description is then useless.
-	D3D11_BUFFER_DESC ibd = {};
-	ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = sizeof(unsigned int) * 3;	// 3 = number of indices in the buffer
-	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;	// Tells DirectX this is an index buffer
-	ibd.CPUAccessFlags = 0;
-	ibd.MiscFlags = 0;
-	ibd.StructureByteStride = 0;
-
-	// Create the proper struct to hold the initial index data
-	// - This is how we put the initial data into the buffer
-	D3D11_SUBRESOURCE_DATA initialIndexData = {};
-	initialIndexData.pSysMem = indices;
-
-	// Actually create the buffer with the initial data
-	// - Once we do this, we'll NEVER CHANGE THE BUFFER AGAIN
-	device->CreateBuffer(&ibd, &initialIndexData, indexBuffer.GetAddressOf());
-
+	// Index array for star
+	unsigned int starIndices[] = { 0, 1, 2, // Pentagon
+								   0, 2, 3,
+								   0, 3, 4,
+								   0, 4, 5,
+								   0, 5, 1,
+								   6, 4, 3, // star tips
+								   7, 5, 4,
+								   8, 1, 5,
+								   9, 2, 1,
+								   10, 3, 2};
+	star = std::make_shared<Mesh>(starVertices, 11, starIndices, 30, device, context);
 }
 
 
@@ -275,30 +277,10 @@ void Game::Draw(float deltaTime, float totalTime)
 	// - However, this isn't always the case (but might be for this course)
 	context->IASetInputLayout(inputLayout.Get());
 
-
-	// Set buffers in the input assembler
-	//  - Do this ONCE PER OBJECT you're drawing, since each object might
-	//    have different geometry.
-	//  - for this demo, this step *could* simply be done once during Init(),
-	//    but I'm doing it here because it's often done multiple times per frame
-	//    in a larger application/game
-	UINT stride = sizeof(Vertex);
-	UINT offset = 0;
-	context->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
-	context->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-
-
-	// Finally do the actual drawing
-	//  - Do this ONCE PER OBJECT you intend to draw
-	//  - This will use all of the currently set DirectX "stuff" (shaders, buffers, etc)
-	//  - DrawIndexed() uses the currently set INDEX BUFFER to look up corresponding
-	//     vertices in the currently set VERTEX BUFFER
-	context->DrawIndexed(
-		3,     // The number of indices to use (we could draw a subset if we wanted)
-		0,     // Offset to the first index we want to use
-		0);    // Offset to add to each index when looking up vertices
-
-
+	// Draws the 3 meshes
+	triangle->Draw();
+	rectangle->Draw();
+	star->Draw();
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it
