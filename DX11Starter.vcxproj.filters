@@ -112,8 +112,5 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="packages.config" />
-    <None Include="PixelShaderIncludes.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
   </ItemGroup>
 </Project>

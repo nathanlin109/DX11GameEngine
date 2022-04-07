@@ -2,13 +2,11 @@
 // Ctor
 Material::Material(DirectX::XMFLOAT4 colorTint,
 	std::shared_ptr<SimpleVertexShader> vertexShader,
-	std::shared_ptr<SimplePixelShader> pixelShader,
-	float roughness)
+	std::shared_ptr<SimplePixelShader> pixelShader)
 {
 	this->colorTint = colorTint;
 	this->vertexShader = vertexShader;
 	this->pixelShader = pixelShader;
-	SetRoughness(roughness);
 
 }
 
@@ -21,23 +19,6 @@ void Material::SetVertexShader(std::shared_ptr<SimpleVertexShader> vertexShader)
 
 std::shared_ptr<SimplePixelShader> Material::GetPixelShader() { return pixelShader; }
 void Material::SetPixelShader(std::shared_ptr<SimplePixelShader> pixelShader) { this->pixelShader = pixelShader; }
-
-float Material::GetRoughness(){ return roughness; }
-
-void Material::SetRoughness(float roughness) 
-{ 
-	this->roughness = roughness;
-
-	// Sets bounds of roughness
-	if (this->roughness < 0) 
-	{
-		this->roughness = 0;
-	}
-	else if (this->roughness > 1)
-	{
-		this->roughness = 1;
-	}
-}
 
 void Material::AddTextureSRV(std::string shaderName, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv)
 {

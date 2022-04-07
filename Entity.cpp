@@ -27,7 +27,6 @@ void Entity::Draw(Microsoft::WRL::ComPtr<ID3D11DeviceContext> context,
 	material->PrepareMaterial(ps);
 	ps->SetFloat4("colorTint", material->GetColorTint());
 	ps->SetFloat("totalTime", totalTime);
-	ps->SetFloat("roughness", material->GetRoughness());
 	ps->SetFloat3("cameraPos", camera->GetTransform()->GetPosition());
 	ps->SetFloat3("ambient", ambientColor);
 	ps->SetData("lights", &lights[0], sizeof(Light) * (int)lights.size());

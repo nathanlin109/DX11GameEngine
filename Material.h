@@ -11,7 +11,6 @@ private:
 	DirectX::XMFLOAT4 colorTint;
 	std::shared_ptr<SimpleVertexShader> vertexShader;
 	std::shared_ptr<SimplePixelShader> pixelShader;
-	float roughness;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textureSRVs;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11SamplerState>> samplers;
 
@@ -19,8 +18,7 @@ public:
 	// Ctor
 	Material(DirectX::XMFLOAT4 colorTint,
 		std::shared_ptr<SimpleVertexShader> vertexShader,
-		std::shared_ptr<SimplePixelShader> pixelShader,
-		float roughness);
+		std::shared_ptr<SimplePixelShader> pixelShader);
 
 	// Getters and setters
 	DirectX::XMFLOAT4 GetColorTint();
@@ -31,9 +29,6 @@ public:
 
 	std::shared_ptr<SimplePixelShader> GetPixelShader();
 	void SetPixelShader(std::shared_ptr<SimplePixelShader> pixelShader);
-
-	float GetRoughness();
-	void SetRoughness(float roughness);
 
 	// Methods
 	void AddTextureSRV(std::string shaderName, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv);

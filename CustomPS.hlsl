@@ -1,5 +1,4 @@
 #include "ShaderIncludes.hlsli"
-#include "PixelShaderIncludes.hlsli"
 cbuffer ExternalData : register(b0)
 {
 	float4 colorTint;

@@ -1,11 +1,10 @@
 #include "ShaderIncludes.hlsli"
-#include "PixelShaderIncludes.hlsli"
 cbuffer ExternalData : register(b0)
 {
     float4 colorTint;
     float roughness;
     float3 cameraPos;
-    Light lights[5];
+    Light lights[6];
     float3 ambient;
 }
 
@@ -26,29 +25,42 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// Normalizes the tangents
     input.tangent = normalize(input.tangent);
 	
+	// Gets texture colors
+    float3 albedo = pow(Albedo.Sample(BasicSampler, input.uv).rgb, 2.2f);
+
+	// Gets roughness
+    float roughness = RoughnessMap.Sample(BasicSampler, input.uv).r;
+	
+	// Gets metallic
+    float metallic = MetallicMap.Sample(BasicSampler, input.uv).r;
+
+	// Gets unpacks normals
+    float3 unpackedNormal = NormalMap.Sample(BasicSampler, input.uv).rgb * 2 - 1;
+	
+	// Gets tangent, bi-tangent, and normal
     input.tangent = normalize(input.tangent - input.normal * dot(input.tangent, input.normal)); // Gram-Schmidt assumes T&N are normalized!
     float3 B = cross(input.tangent, input.normal);
     float3x3 TBN = float3x3(input.tangent, B, input.normal);
 	
-	// Unpacks normals
-    float3 unpackedNormal = NormalTexture.Sample(BasicSampler, input.uv).rgb * 2 - 1;
-	
     input.normal = mul(unpackedNormal, TBN);
 	
-	// Gets texture colors
-    float3 surfaceColor = SurfaceTexture.Sample(BasicSampler, input.uv).rgb;
-    float specularScale = SpecularTexture.Sample(BasicSampler, input.uv).r;
+	// Specular color determination -----------------
+	// Assume albedo texture is actually holding specular color where metalness == 1
+	
+	// Note the use of lerp here - metal is generally 0 or 1, but might be in between
+	// because of linear texture sampling, so we lerp the specular color to match
+    float3 specularColor = lerp(F0_NON_METAL.rrr, albedo.rgb, metallic);
 	
 	// Calculates final pixel color
     float3 finalColor =
-		(surfaceColor) +
-		CalculateLight(lights[0], input, roughness, specularScale, cameraPos, colorTint) + // Directional
-		CalculateLight(lights[1], input, roughness, specularScale, cameraPos, colorTint) + // Directional
-		CalculateLight(lights[2], input, roughness, specularScale, cameraPos, colorTint) + // Directional
-		CalculateLight(lights[3], input, roughness, specularScale, cameraPos, colorTint) + // Point
-		CalculateLight(lights[4], input, roughness, specularScale, cameraPos, colorTint) + // Point
+		CalculateLight(lights[0], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
+		CalculateLight(lights[1], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
+		CalculateLight(lights[2], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
+		CalculateLight(lights[3], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Point
+		CalculateLight(lights[4], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Point
+		CalculateLight(lights[5], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
 		(ambient * colorTint);
 
 	// Color tint with ambient lighting
-    return float4(finalColor, 1);
+    return float4(pow(finalColor, 1.0f / 2.2f), 1);
 }

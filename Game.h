@@ -37,6 +37,7 @@ private:
 
 	// Initialization helper methods - feel free to customize, combine, etc.
 	void LoadShaders(); 
+	void LoadTextures(std::wstring fileName);
 	void CreateBasicGeometry();
 
 	// Camera
@@ -59,6 +60,12 @@ private:
 	std::shared_ptr<SimplePixelShader> customPixelShader;
 	std::shared_ptr<SimpleVertexShader> skyVertexShader;
 	std::shared_ptr<SimplePixelShader> skyPixelShader;
+
+	// SVPtrs
+	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> albedoSVPtrs;
+	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> metallicSVPtrs;
+	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> normalSVPtrs;
+	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> roughnessSVPtrs;
 
 	// Lighting
 	DirectX::XMFLOAT3 ambientColor;
