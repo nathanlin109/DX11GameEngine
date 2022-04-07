@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "Vertex.h"
 #include "Input.h"
+#include "WICTextureLoader.h"
 
 // Needed for a helper function to read compiled shader files from the hard drive
 #pragma comment(lib, "d3dcompiler.lib")
@@ -31,6 +32,10 @@ Game::Game(HINSTANCE hInstance)
 	CreateConsoleWindow(500, 120, 32, 120);
 	printf("Console window created successfully.  Feel free to printf() here.\n");
 #endif
+
+	// Creates camera
+	camera = std::make_shared<Camera>(12, 0, -25,
+		(float)width / height, 3, 1.5f, 2);
 }
 
 // --------------------------------------------------------
@@ -57,8 +62,141 @@ void Game::Init()
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	LoadShaders();
+
+	// Loads textures
+	// Cobblestone albedo
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cobblestoneSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/cobblestone/cobblestone.png").c_str(),
+		nullptr, &cobblestoneSRVPtr);
+	// Cobblestone normal
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cobblestoneNormalsSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/cobblestone/cobblestone_normals.png").c_str(),
+		nullptr, &cobblestoneNormalsSRVPtr);
+	// Cushion albedo
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cushionSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/cushion/cushion.png").c_str(),
+		nullptr, &cushionSRVPtr);
+	// Cushion normal
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cushionNormalsSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/cushion/cushion_normals.png").c_str(),
+		nullptr, &cushionNormalsSRVPtr);
+	// Rock albedo
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> rockSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/rock/rock.png").c_str(),
+		nullptr, &rockSRVPtr);
+	// Rock normal
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> rockNormalsSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/rock/rock_normals.png").c_str(),
+		nullptr, &rockNormalsSRVPtr);
+	// Specular texture to use for everything (black spec)
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> generalSpecularSRVPtr;
+	CreateWICTextureFromFile(device.Get(), context.Get(),
+		GetFullPathTo_Wide(L"../../Assets/Textures/general_metallic_white.png").c_str(),
+		nullptr, &generalSpecularSRVPtr);
+
+	// Creates sampler state
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerState;
+
+	D3D11_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+	samplerDesc.MaxAnisotropy = 16;
+	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	device->CreateSamplerState(&samplerDesc, &samplerState);
+
+	// Creates some materials
+	// Purple
+	materials.push_back(std::make_shared<Material>(
+		XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f), vertexShader, pixelShader, 0.15f));
+	// Yellow
+	materials.push_back(std::make_shared<Material>(
+		XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f), vertexShader, pixelShader, 0.15f));
+	// Cyan
+	materials.push_back(std::make_shared<Material>(
+		XMFLOAT4(0.0f, 1.0f, 1.0f, 1.0f), vertexShader, pixelShader, 0.15f));
+	// White/cobblestone
+	materials.push_back(std::make_shared<Material>(
+		XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), vertexShader, pixelShader, 0.15f));
+	// White/cushion
+	materials.push_back(std::make_shared<Material>(
+		XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), vertexShader, pixelShader, 0.15f));
+	// White/rock
+	materials.push_back(std::make_shared<Material>(
+		XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), vertexShader, pixelShader, 0.15f));
+
+	// Adds SRV's and samplers to materials
+	materials[3]->AddTextureSRV("SurfaceTexture", cobblestoneSRVPtr);
+	materials[3]->AddTextureSRV("NormalTexture", cobblestoneNormalsSRVPtr);
+	materials[3]->AddTextureSRV("SpecularTexture", generalSpecularSRVPtr);
+	materials[3]->AddSampler("BasicSampler", samplerState);
+	materials[4]->AddTextureSRV("SurfaceTexture", cushionSRVPtr);
+	materials[4]->AddTextureSRV("NormalTexture", cushionNormalsSRVPtr);
+	materials[4]->AddTextureSRV("SpecularTexture", generalSpecularSRVPtr);
+	materials[4]->AddSampler("BasicSampler", samplerState);
+	materials[5]->AddTextureSRV("SurfaceTexture", rockSRVPtr);
+	materials[5]->AddTextureSRV("NormalTexture", rockNormalsSRVPtr);
+	materials[5]->AddTextureSRV("SpecularTexture", generalSpecularSRVPtr);
+	materials[5]->AddSampler("BasicSampler", samplerState);
+
+	// Sets lighting variables
+	// Ambient
+	ambientColor = XMFLOAT3(0.1f, 0.1f, 0.15f);
+	//ambientColor = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+	// Lights
+	// Red directional right
+	lights.push_back({});
+	lights[0].Type = LIGHT_TYPE_DIRECTIONAL;
+	lights[0].Direction = XMFLOAT3(1, 0, 0);
+	lights[0].Color = XMFLOAT3(0, 0, 0);
+	lights[0].Intensity = 0.4f;
+
+	// Green directional down
+	lights.push_back({});
+	lights[1].Type = LIGHT_TYPE_DIRECTIONAL;
+	lights[1].Direction = XMFLOAT3(0, -1, 0);
+	lights[1].Color = XMFLOAT3(1, 1, 1);
+	lights[1].Intensity = 0.4f;
+
+	// Blue directional up at an angle
+	lights.push_back({});
+	lights[2].Type = LIGHT_TYPE_DIRECTIONAL;
+	lights[2].Direction = XMFLOAT3(-1, 1, -0.5f);
+	lights[2].Color = XMFLOAT3(1, 1, 1);
+	lights[2].Intensity = 0.4f;
+
+	// White point light with range 10 positioned between sphere and helix
+	lights.push_back({});
+	lights[3].Type = LIGHT_TYPE_POINT;
+	lights[3].Range = 10;
+	lights[3].Position = XMFLOAT3(10, 0, 0);
+	lights[3].Color = XMFLOAT3(1, 1, 1);
+	lights[3].Intensity = 0.4f;
+
+	// Dim white point light with range 10 positioned between sphere and torus
+	lights.push_back({});
+	lights[4].Type = LIGHT_TYPE_POINT;
+	lights[4].Range = 10;
+	lights[4].Position = XMFLOAT3(14, 0, 0);
+	lights[4].Color = XMFLOAT3(1, 1, 1);
+	lights[4].Intensity = 0.4f;
+
 	CreateBasicGeometry();
-	
+
+	// Creates sky box
+	skyBox = std::make_shared<Sky>(meshes[0], samplerState, device, 
+		GetFullPathTo_Wide(L"../../Assets/Textures/skies/SunnyCubeMap.dds").c_str(),
+		skyVertexShader, skyPixelShader);
+
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
 	// Essentially: "What kind of shape should the GPU draw with our data?"
@@ -75,65 +213,21 @@ void Game::Init()
 // --------------------------------------------------------
 void Game::LoadShaders()
 {
-	// Blob for reading raw data
-	// - This is a simplified way of handling raw data
-	ID3DBlob* shaderBlob;
+	// Simple shader code
+	vertexShader = std::make_shared<SimpleVertexShader>(device, context,
+		GetFullPathTo_Wide(L"VertexShader.cso").c_str());
 
-	// Read our compiled vertex shader code into a blob
-	// - Essentially just "open the file and plop its contents here"
-	D3DReadFileToBlob(
-		GetFullPathTo_Wide(L"VertexShader.cso").c_str(), // Using a custom helper for file paths
-		&shaderBlob);
+	pixelShader = std::make_shared<SimplePixelShader>(device, context,
+		GetFullPathTo_Wide(L"PixelShader.cso").c_str());
 
-	// Create a vertex shader from the information we
-	// have read into the blob above
-	// - A blob can give a pointer to its contents, and knows its own size
-	device->CreateVertexShader(
-		shaderBlob->GetBufferPointer(), // Get a pointer to the blob's contents
-		shaderBlob->GetBufferSize(),	// How big is that data?
-		0,								// No classes in this shader
-		vertexShader.GetAddressOf());	// The address of the ID3D11VertexShader*
+	skyVertexShader = std::make_shared<SimpleVertexShader>(device, context,
+		GetFullPathTo_Wide(L"SkyVertexShader.cso").c_str());
 
+	skyPixelShader = std::make_shared<SimplePixelShader>(device, context,
+		GetFullPathTo_Wide(L"SkyPixelShader.cso").c_str());
 
-	// Create an input layout that describes the vertex format
-	// used by the vertex shader we're using
-	//  - This is used by the pipeline to know how to interpret the raw data
-	//     sitting inside a vertex buffer
-	//  - Doing this NOW because it requires a vertex shader's byte code to verify against!
-	//  - Luckily, we already have that loaded (the blob above)
-	D3D11_INPUT_ELEMENT_DESC inputElements[2] = {};
-
-	// Set up the first element - a position, which is 3 float values
-	inputElements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;				// Most formats are described as color channels; really it just means "Three 32-bit floats"
-	inputElements[0].SemanticName = "POSITION";							// This is "POSITION" - needs to match the semantics in our vertex shader input!
-	inputElements[0].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;	// How far into the vertex is this?  Assume it's after the previous element
-
-	// Set up the second element - a color, which is 4 more float values
-	inputElements[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;			// 4x 32-bit floats
-	inputElements[1].SemanticName = "COLOR";							// Match our vertex shader input!
-	inputElements[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;	// After the previous element
-
-	// Create the input layout, verifying our description against actual shader code
-	device->CreateInputLayout(
-		inputElements,					// An array of descriptions
-		2,								// How many elements in that array
-		shaderBlob->GetBufferPointer(),	// Pointer to the code of a shader that uses this layout
-		shaderBlob->GetBufferSize(),	// Size of the shader code that uses this layout
-		inputLayout.GetAddressOf());	// Address of the resulting ID3D11InputLayout*
-
-
-
-	// Read and create the pixel shader
-	//  - Reusing the same blob here, since we're done with the vert shader code
-	D3DReadFileToBlob(
-		GetFullPathTo_Wide(L"PixelShader.cso").c_str(), // Using a custom helper for file paths
-		&shaderBlob);
-
-	device->CreatePixelShader(
-		shaderBlob->GetBufferPointer(),
-		shaderBlob->GetBufferSize(),
-		0,
-		pixelShader.GetAddressOf());
+	/*customPixelShader = std::make_shared<SimplePixelShader>(device, context,
+		GetFullPathTo_Wide(L"CustomPS.cso").c_str());*/
 }
 
 
@@ -143,83 +237,57 @@ void Game::LoadShaders()
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
-	// Create some temporary variables to represent colors
-	// - Not necessary, just makes things more readable
-	XMFLOAT4 red = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
-	XMFLOAT4 green = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	XMFLOAT4 blue = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
+	// Creates the meshes
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/cube.obj").c_str(), device));
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/cylinder.obj").c_str(), device));
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/helix.obj").c_str(), device));
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/sphere.obj").c_str(), device));
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/torus.obj").c_str(), device));
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/quad.obj").c_str(), device));
+	meshes.push_back(std::make_shared<Mesh>(GetFullPathTo("../../Assets/Models/quad_double_sided.obj").c_str(), device));
 
-	// Set up the vertices of the triangle we would like to draw
-	// - We're going to copy this array, exactly as it exists in memory
-	//    over to a DirectX-controlled data structure (the vertex buffer)
-	// - Note: Since we don't have a camera or really any concept of
-	//    a "3d world" yet, we're simply describing positions within the
-	//    bounds of how the rasterizer sees our screen: [-1 to +1] on X and Y
-	// - This means (0,0) is at the very center of the screen.
-	// - These are known as "Normalized Device Coordinates" or "Homogeneous 
-	//    Screen Coords", which are ways to describe a position without
-	//    knowing the exact size (in pixels) of the image/window/etc.  
-	// - Long story short: Resizing the window also resizes the triangle,
-	//    since we're describing the triangle in terms of the window itself
-	Vertex triangleVertices[] =
+	// Creates the entities from the meshes
+	for (int i = 0; i < meshes.size(); i++)
 	{
-		{ XMFLOAT3(+0.0f, +0.5f, +0.0f), red },
-		{ XMFLOAT3(+0.5f, -0.5f, +0.0f), blue },
-		{ XMFLOAT3(-0.5f, -0.5f, +0.0f), green },
-	};
+		// Adds entity to vector
+		if (i % 3 == 0) 
+		{
+			entities.push_back(std::make_shared<Entity>(Transform(), meshes[i], materials[3]));
+		}
+		else if (i % 3 == 1)
+		{
+			entities.push_back(std::make_shared<Entity>(Transform(), meshes[i], materials[4]));
+		}
+		else if (i % 3 == 2)
+		{
+			entities.push_back(std::make_shared<Entity>(Transform(), meshes[i], materials[5]));
+		}
+		entities[i]->GetTransform()->SetPosition((float)i * 4, 0, 0);
 
-	// Set up the indices, which tell us which vertices to use and in which order
-	// - This is somewhat redundant for just 3 vertices (it's a simple example)
-	// - Indices are technically not required if the vertices are in the buffer 
-	//    in the correct order and each one will be used exactly once
-	// - But just to see how it's done...
-	unsigned int triangleIndices[] = { 0, 1, 2 };
-
-	triangle = std::make_shared<Mesh>(triangleVertices, 3, triangleIndices, 3, device, context);
-
-	// Vertex array for rectangle
-	Vertex rectangleVertices[] =
-	{
-		{ XMFLOAT3(-0.75f, +0.5f, +0.0f), red }, // Top left
-		{ XMFLOAT3(-0.5f, +0.0f, +0.0f), blue }, // Bottom right
-		{ XMFLOAT3(-0.75f, +0.0f, +0.0f), green }, // Bottom left
-		{ XMFLOAT3(-0.5f, +0.5f, +0.0f), green }, // Top right
-	};
-
-	// Index array for rectangle
-	unsigned int rectangleIndices[] = { 0, 1, 2, 0, 3, 1 };
-	rectangle = std::make_shared<Mesh>(rectangleVertices, 4, rectangleIndices, 6, device, context);
-
-	// Vertex array for star
-	Vertex starVertices[] =
-	{
-		// Create a pentagon first
-		{ XMFLOAT3(+0.6f, +0.35f, +0.0f), red }, // center
-		{ XMFLOAT3(+0.6f, +0.1f, +0.0f), green }, // Bottom
-		{ XMFLOAT3(+0.35f, +0.35f, +0.0f), green }, // bottom left
-		{ XMFLOAT3(+0.45f, +0.6f, +0.0f), green }, // top left
-		{ XMFLOAT3(+0.75f, +0.6f, +0.0f), green }, // top right
-		{ XMFLOAT3(+0.85f, +0.35f, +0.0f), green }, // bottom right
-		// Create triangles on edges of pentagon
-		{ XMFLOAT3(+0.6f, +0.85f, +0.0f), blue }, // top tip
-		{ XMFLOAT3(+0.95f, +0.6f, +0.0f), blue }, // top right tip
-		{ XMFLOAT3(+0.9f, +0.01f, +0.0f), blue }, // bottom right tip
-		{ XMFLOAT3(+0.3f, +0.0f, +0.0f), blue }, // bottom left tip
-		{ XMFLOAT3(+0.25f, +0.6f, +0.0f), blue }, // top left tip
-	};
-
-	// Index array for star
-	unsigned int starIndices[] = { 0, 1, 2, // Pentagon
-								   0, 2, 3,
-								   0, 3, 4,
-								   0, 4, 5,
-								   0, 5, 1,
-								   6, 4, 3, // star tips
-								   7, 5, 4,
-								   8, 1, 5,
-								   9, 2, 1,
-								   10, 3, 2};
-	star = std::make_shared<Mesh>(starVertices, 11, starIndices, 30, device, context);
+		// Rotates quads
+		if (i >= meshes.size() - 2)
+		{
+			entities[i]->GetTransform()->SetRotation(-45, -1, 0);
+		}
+		// 1/3 of meshes w/ purple tint
+		/*if (i < meshes.size() / 3)
+		{
+			// Adds entity to vector
+			entities.push_back(std::make_shared<Entity>(Transform(), meshes[i], materials[0]));
+		}
+		// 1/3 of meshes w/ yellow tint
+		else if (i > meshes.size() / 3 + meshes.size() / 3)
+		{
+			// Adds entity to vector
+			entities.push_back(std::make_shared<Entity>(Transform(), meshes[i], materials[1]));
+		}
+		// 1/3 of meshes w/ cyan tint
+		else
+		{
+			// Adds entity to vector
+			entities.push_back(std::make_shared<Entity>(Transform(), meshes[i], materials[2]));
+		}*/
+	}
 }
 
 
@@ -231,6 +299,9 @@ void Game::OnResize()
 {
 	// Handle base-level DX resize stuff
 	DXCore::OnResize();
+
+	// Updates the projection matrix
+	camera->UpdateProjectionMatrix((float)width / height);
 }
 
 // --------------------------------------------------------
@@ -241,6 +312,17 @@ void Game::Update(float deltaTime, float totalTime)
 	// Example input checking: Quit if the escape key is pressed
 	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
+
+	// Makes entities change their transforms with sin
+	for (int i = 0; i < entities.size(); i++)
+	{
+		//entities[i]->GetTransform()->SetPosition(sin(totalTime) * (float)i / 1.5f, 0, 0);
+		//entities[i]->GetTransform()->SetScale(sin(totalTime) / 4, sin(totalTime) / 4, sin(totalTime) / 4);
+		//entities[i]->GetTransform()->Rotate(0, sin(deltaTime), 0);
+	}
+
+	// Updates camera
+	camera->Update(deltaTime);
 }
 
 // --------------------------------------------------------
@@ -250,6 +332,7 @@ void Game::Draw(float deltaTime, float totalTime)
 {
 	// Background color (Cornflower Blue in this case) for clearing
 	const float color[4] = { 0.4f, 0.6f, 0.75f, 0.0f };
+	//const float color[4] = { 0, 0, 0, 0.0f };
 
 	// Clear the render target and depth buffer (erases what's on the screen)
 	//  - Do this ONCE PER FRAME
@@ -261,26 +344,14 @@ void Game::Draw(float deltaTime, float totalTime)
 		1.0f,
 		0);
 
+	// Draws entities
+	for (std::shared_ptr<Entity> entity : entities)
+	{
+		entity->Draw(context, camera, totalTime, ambientColor, lights);
+	}
 
-	// Set the vertex and pixel shaders to use for the next Draw() command
-	//  - These don't technically need to be set every frame
-	//  - Once you start applying different shaders to different objects,
-	//    you'll need to swap the current shaders before each draw
-	context->VSSetShader(vertexShader.Get(), 0, 0);
-	context->PSSetShader(pixelShader.Get(), 0, 0);
-
-
-	// Ensure the pipeline knows how to interpret the data (numbers)
-	// from the vertex buffer.  
-	// - If all of your 3D models use the exact same vertex layout,
-	//    this could simply be done once in Init()
-	// - However, this isn't always the case (but might be for this course)
-	context->IASetInputLayout(inputLayout.Get());
-
-	// Draws the 3 meshes
-	triangle->Draw();
-	rectangle->Draw();
-	star->Draw();
+	// Draws sky box after entities
+	skyBox->Draw(context, camera);
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it

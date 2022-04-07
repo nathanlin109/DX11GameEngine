@@ -1,0 +1,1 @@
+Added specular map as extra texture related feature.
