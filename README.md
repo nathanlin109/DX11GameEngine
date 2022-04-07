@@ -1,2 +1,2 @@
-# DX11Starter
-Starter code for a DX11 project
+# DX11GameEngine
+Custom game engine built using DirectX 11 and Microsoft Visual Studio 2019 in C++ & HSLS.
