@@ -228,7 +228,7 @@ float3 CalculateLight(Light light, VertexToPixel input, float3 albedo, float rou
     float3 balancedDiff = DiffuseEnergyConserve(diffuse, spec, metallic);
 	
 	// Calculates light
-    float3 finalLight = (balancedDiff + albedo + spec) * light.Color * light.Intensity * colorTint;
+    float3 finalLight = (balancedDiff * albedo + spec) * light.Color * light.Intensity * colorTint;
 	
 	// Attenuates light if point
     if (light.Type == LIGHT_TYPE_POINT)

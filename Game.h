@@ -15,7 +15,7 @@
 #include <vector>
 #include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
 
-class Game 
+class Game
 	: public DXCore
 {
 
@@ -36,9 +36,10 @@ private:
 	bool vsync;
 
 	// Initialization helper methods - feel free to customize, combine, etc.
-	void LoadShaders(); 
+	void LoadShaders();
 	void LoadTextures(std::wstring fileName);
-	void CreateBasicGeometry();
+	void LoadAssetsAndCreateEntities();
+	void GenerateLights();
 
 	// Camera
 	std::shared_ptr<Camera> camera;
@@ -53,7 +54,7 @@ private:
 	//  - This is a smart pointer for objects that abide by the
 	//    Component Object Model, which DirectX objects do
 	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
-	
+
 	// Shaders and shader-related constructs
 	std::shared_ptr<SimpleVertexShader> vertexShader;
 	std::shared_ptr<SimplePixelShader> pixelShader;
@@ -73,5 +74,60 @@ private:
 
 	// Sky box
 	std::shared_ptr<Sky> skyBox;
-};
 
+	// Post processing resources
+	// ----------------BLUR--------------
+	int blurAmount;
+	int additionalBlurAmount;
+	float blurMultiplier;
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> ppRTV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> ppSRV;
+	std::shared_ptr<SimpleVertexShader> ppVS;
+	std::shared_ptr<SimplePixelShader> fullScreenBlurPS;
+	void fullScreenBlur();
+
+	// --------------BLOOM---------------
+	static const int MaxBloomLevels = 5;
+
+	bool drawBloomTextures;
+	int bloomLevels;
+	float bloomThreshold;
+	float bloomLevelIntensities[MaxBloomLevels];
+
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> ppSampler; // Clamp sampler for post processing
+
+	// Render targets and shader resources
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> bloomExtractRTV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> bloomExtractSRV;
+	
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> bloomCombineRTV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> bloomCombineSRV;
+
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> blurHorizontalRTV[MaxBloomLevels];
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> blurHorizontalSRV[MaxBloomLevels];
+
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> blurVerticalRTV[MaxBloomLevels];
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> blurVerticalSRV[MaxBloomLevels];
+
+	// Pixel shaders
+	std::shared_ptr<SimplePixelShader> bloomExtractPS;
+	std::shared_ptr<SimplePixelShader> gaussianBlurPS;
+	std::shared_ptr<SimplePixelShader> bloomCombinePS;
+
+	// Bloom helpers
+	void BloomExtract();
+	void SingleDirectionBlur(
+		float renderTargetScale,
+		DirectX::XMFLOAT2 blurDirection,
+		Microsoft::WRL::ComPtr<ID3D11RenderTargetView> target,
+		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> sourceTexture);
+	void BloomCombine();
+
+	// Post processing resizing
+	void ResizeAllPostProcessResources();
+	void ResizeOnePostProcessResource(
+		Microsoft::WRL::ComPtr<ID3D11RenderTargetView>& rtv,
+		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& srv,
+		float renderTargetScale,
+		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
+};

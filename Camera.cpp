@@ -10,6 +10,7 @@ Camera::Camera(float x, float y, float z,
 	UpdateViewMatrix();
 	UpdateProjectionMatrix(aspectRatio);
 	this->moveSpeed = moveSpeed;
+	this->currentMoveSpeed = moveSpeed;
 	this->speedUpMultiplier = speedUpMultiplier;
 	this->mouseLookSpeed = mouseLookSpeed;
 }
@@ -24,45 +25,63 @@ void Camera::Update(float dt)
 	// Gets input singleton
 	Input& input = Input::GetInstance();
 
-	float speed = moveSpeed;
+	moving = false;
 
 	// Handles camera movement from input
 	// ----------------Keyboard Input----------------
 	// Speeds up movement if shift is held
 	if (input.KeyDown(VK_SHIFT))
 	{
-		speed *= speedUpMultiplier;
+		currentMoveSpeed += speedUpMultiplier * dt;
+
+		// Clamps move speed
+		currentMoveSpeed = min(max(currentMoveSpeed, 0), 15); // Clamp between 0 and 15
+	}
+	else 
+	{
+		currentMoveSpeed = moveSpeed;
 	}
 
 	// Forward
 	if (input.KeyDown('W')) 
 	{
-		transform.MoveRelative(0, 0, speed * dt);
+		transform.MoveRelative(0, 0, currentMoveSpeed * dt);
+		moving = true;
 	}
 	// Backwards
 	if (input.KeyDown('S'))
 	{
-		transform.MoveRelative(0, 0, -speed * dt);
+		transform.MoveRelative(0, 0, -currentMoveSpeed * dt);
+		moving = true;
 	}
 	// Right
 	if (input.KeyDown('D'))
 	{
-		transform.MoveRelative(speed * dt, 0, 0);
+		transform.MoveRelative(currentMoveSpeed * dt, 0, 0);
+		moving = true;
 	}
 	// Left
 	if (input.KeyDown('A'))
 	{
-		transform.MoveRelative(-speed * dt, 0, 0);
+		transform.MoveRelative(-currentMoveSpeed * dt, 0, 0);
+		moving = true;
 	}
 	// Up
 	if (input.KeyDown(VK_SPACE))
 	{
-		transform.MoveRelative(0, speed * dt, 0);
+		transform.MoveRelative(0, currentMoveSpeed * dt, 0);
+		moving = true;
 	}
 	// Down
 	if (input.KeyDown('X'))
 	{
-		transform.MoveRelative(0, -speed * dt, 0);
+		transform.MoveRelative(0, -currentMoveSpeed * dt, 0);
+		moving = true;
+	}
+
+	if (moving == false)
+	{
+		currentMoveSpeed = 0;
 	}
 
 	// ----------------Mouse Input----------------
@@ -78,15 +97,15 @@ void Camera::Update(float dt)
 		transform.Rotate(cursorMovementY, 0, 0);
 
 		// Clamps the x axis rotation, so the camera doesn't flip over
-		if (transform.GetPitchYawRoll().x > XM_PIDIV2) 
+		if (transform.GetPitchYawRoll().x > XM_PIDIV2 - .01)
 		{
-			transform.SetRotation(XM_PIDIV2,
+			transform.SetRotation(XM_PIDIV2 - .01,
 				transform.GetPitchYawRoll().y,
 				transform.GetPitchYawRoll().z);
 		}
-		else if (transform.GetPitchYawRoll().x < -XM_PIDIV2)
+		else if (transform.GetPitchYawRoll().x < -XM_PIDIV2 + .01)
 		{
-			transform.SetRotation(-XM_PIDIV2,
+			transform.SetRotation(-XM_PIDIV2 + .01,
 				transform.GetPitchYawRoll().y,
 				transform.GetPitchYawRoll().z);
 		}
@@ -128,6 +147,8 @@ void Camera::UpdateProjectionMatrix(float aspectRatio)
 }
 
 Transform* Camera::GetTransform(){ return &transform; }
+
+float Camera::getCurrentMoveSpeed(){ return currentMoveSpeed; }
 
 XMFLOAT4X4 Camera::GetViewMatrix(){ return viewMatrix; }
 

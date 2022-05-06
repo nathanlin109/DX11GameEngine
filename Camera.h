@@ -24,6 +24,9 @@ public:
 	// Getter for the transform
 	Transform* GetTransform();
 
+	// Getter for current move speed
+	float getCurrentMoveSpeed();
+
 private:
 	// Camera matrices
 	DirectX::XMFLOAT4X4 viewMatrix;
@@ -34,7 +37,9 @@ private:
 
 	// Additional custom fields
 	float moveSpeed;
+	float currentMoveSpeed;
 	float speedUpMultiplier;
 	float mouseLookSpeed;
+	bool moving;
 };
 

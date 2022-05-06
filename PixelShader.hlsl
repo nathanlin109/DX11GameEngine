@@ -1,10 +1,13 @@
 #include "ShaderIncludes.hlsli"
+// Num of lights
+static const int lightCount = 26;
+
 cbuffer ExternalData : register(b0)
 {
     float4 colorTint;
     float roughness;
     float3 cameraPos;
-    Light lights[6];
+    Light lights[lightCount];
     float3 ambient;
 }
 
@@ -42,7 +45,7 @@ float4 main(VertexToPixel input) : SV_TARGET
     float3 B = cross(input.tangent, input.normal);
     float3x3 TBN = float3x3(input.tangent, B, input.normal);
 	
-    input.normal = mul(unpackedNormal, TBN);
+    input.normal = normalize(mul(unpackedNormal, TBN));
 	
 	// Specular color determination -----------------
 	// Assume albedo texture is actually holding specular color where metalness == 1
@@ -51,15 +54,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 	// because of linear texture sampling, so we lerp the specular color to match
     float3 specularColor = lerp(F0_NON_METAL.rrr, albedo.rgb, metallic);
 	
-	// Calculates final pixel color
-    float3 finalColor =
-		CalculateLight(lights[0], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
-		CalculateLight(lights[1], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
-		CalculateLight(lights[2], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
-		CalculateLight(lights[3], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Point
-		CalculateLight(lights[4], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Point
-		CalculateLight(lights[5], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint) + // Directional
-		(ambient * colorTint);
+    //float3 finalColor = (ambient * colorTint); // Remove ambient from pbr
+    // Calculates final pixel color
+    float3 finalColor = 0;
+    for (int i = 0; i < lightCount; i++)
+    {
+        finalColor += CalculateLight(lights[i], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint);
+    }
 
 	// Color tint with ambient lighting
     return float4(pow(finalColor, 1.0f / 2.2f), 1);
