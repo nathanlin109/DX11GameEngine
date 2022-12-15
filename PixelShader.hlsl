@@ -62,6 +62,6 @@ float4 main(VertexToPixel input) : SV_TARGET
         finalColor += CalculateLight(lights[i], input, albedo, roughness, metallic, specularColor, cameraPos, colorTint);
     }
 
-	// Color tint with ambient lighting
+	// Final color
     return float4(pow(finalColor, 1.0f / 2.2f), 1);
 }
